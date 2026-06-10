@@ -243,7 +243,14 @@ object RomajiTranslator {
                 val isCurrentPunctuation = isPunctuation(token)
                 val isPrevPunctuation = isPunctuation(prevToken)
 
-                !(isCurrentSuffix || isCurrentAuxVerb || isPrevPrefix || isCurrentPunctuation || isPrevPunctuation)
+                val isCurrentSokuon = surface.startsWith('っ') || surface.startsWith('ッ')
+                val isPrevEndingInSokuon = prevToken.surface.endsWith('っ') || prevToken.surface.endsWith('ッ')
+
+                if (isCurrentSokuon || isPrevEndingInSokuon) {
+                    false
+                } else {
+                    !(isCurrentSuffix || isCurrentAuxVerb || isPrevPrefix || isCurrentPunctuation || isPrevPunctuation)
+                }
             }
 
             if (needsSpace && currentGroup.tokens.isNotEmpty()) {

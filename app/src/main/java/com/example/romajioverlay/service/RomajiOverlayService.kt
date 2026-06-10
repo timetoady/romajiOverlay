@@ -143,11 +143,6 @@ class RomajiOverlayService : AccessibilityService() {
             // Verify package matches Google Messages before traversing layout to prevent node corruption
             val packageName = root.packageName?.toString()
             if (packageName != "com.google.android.apps.messaging") {
-                try {
-                    root.recycle()
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
                 overlayCanvasView.updateItems(emptyList())
                 return
             }
@@ -156,11 +151,6 @@ class RomajiOverlayService : AccessibilityService() {
 
             // 1. Synchronously traverse tree and pull out layout data on main thread
             traverseNode(root, pendingNodes)
-            try {
-                root.recycle() // Recycle root node immediately
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
 
             if (pendingNodes.isEmpty()) {
                 overlayCanvasView.updateItems(emptyList())
@@ -186,7 +176,7 @@ class RomajiOverlayService : AccessibilityService() {
 
     /**
      * Recursively traverses nodes, captures texts containing Japanese,
-     * and copies bounds. Recycles child nodes immediately to optimize memory.
+     * and copies bounds.
      */
     private fun traverseNode(node: AccessibilityNodeInfo?, targetList: MutableList<PendingNode>) {
         if (node == null) return
@@ -207,11 +197,6 @@ class RomajiOverlayService : AccessibilityService() {
                 val child = node.getChild(i)
                 if (child != null) {
                     traverseNode(child, targetList)
-                    try {
-                        child.recycle() // Clean up child node reference
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
                 }
             }
         } catch (e: Exception) {

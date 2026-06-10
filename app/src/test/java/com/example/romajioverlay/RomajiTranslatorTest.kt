@@ -80,4 +80,20 @@ class RomajiTranslatorTest {
         val result4 = RomajiTranslator.translateTokens(tokens4)
         assertEquals("omise ni ikimasu", result4)
     }
+
+    @Test
+    fun testSokuonContractionsInSentences() {
+        val tokens1 = tokenizer.tokenize("作った")
+        val result1 = RomajiTranslator.translateTokens(tokens1)
+        assertEquals("tsukutta", result1)
+
+        val tokens2 = tokenizer.tokenize("そっか")
+        val result2 = RomajiTranslator.translateTokens(tokens2)
+        assertEquals("sokka", result2)
+
+        val tokens3 = tokenizer.tokenize("合ってる")
+        val result3 = RomajiTranslator.translateTokens(tokens3)
+        assertEquals("atteru", result3)
+    }
 }
+
