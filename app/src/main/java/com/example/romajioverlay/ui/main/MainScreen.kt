@@ -304,6 +304,26 @@ fun GuideCard() {
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "⚠️ Blocked by 'Restricted Setting'?",
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = MaterialTheme.colorScheme.error
+            )
+            Text(
+                "If Android blocks the toggle with a security warning, you can allow it by:\n" +
+                "1. Going to device Settings -> Apps -> RomajiOverlay.\n" +
+                "2. Tapping the three dots (右上) in the top-right corner.\n" +
+                "3. Selecting 'Allow restricted settings' and authenticating.\n" +
+                "4. Returning to Accessibility Settings to turn the service ON.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
+                modifier = Modifier.padding(top = 4.dp)
+            )
         }
     }
 }

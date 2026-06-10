@@ -42,6 +42,17 @@ Android Accessibility Services must be manually enabled in your system settings 
 5. Switch the toggle **Use RomajiOverlay** to **ON**.
 6. Tap **Allow** on the system permission request dialog.
 
+> [!IMPORTANT]
+> **Android 13+ "Restricted Setting" Bypass:**
+> Since this APK is sideloaded (downloaded outside the Google Play Store), Android will initially block the toggle switch and show a warning stating **"Restricted setting"**.
+>
+> To unlock it:
+> 1. Open your device's main **Settings** and go to **Apps** (or **See all apps**).
+> 2. Search for and select **RomajiOverlay**.
+> 3. Tap the **three-dot menu icon** in the top-right corner of the *App Info* page.
+> 4. Select **Allow restricted settings** and authenticate (PIN, pattern, or fingerprint).
+> 5. Return to **Settings > Accessibility > RomajiOverlay**; the switch will now be clickable.
+
 ### Step 2: Configure Render Settings (Optional)
 1. Open the **RomajiOverlay** app from your home screen launcher.
 2. Under **Overlay Render Mode**, select either:
