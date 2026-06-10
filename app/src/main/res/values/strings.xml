@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">RomajiOverlay</string>
+    <string name="accessibility_service_description">Translates Japanese text in Google Messages to Romaji and shows it as an overlay.</string>
+</resources>
