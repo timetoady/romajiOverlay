@@ -68,8 +68,14 @@ class RomajiOverlayService : AccessibilityService() {
             height = WindowManager.LayoutParams.MATCH_PARENT
         }
 
-        // Add full-screen overlay view to window manager
-        windowManager.addView(overlayCanvasView, layoutParams)
+        // Add full-screen overlay view to window manager safely
+        try {
+            if (overlayCanvasView.parent == null) {
+                windowManager.addView(overlayCanvasView, layoutParams)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
@@ -130,30 +136,38 @@ class RomajiOverlayService : AccessibilityService() {
      * Traverses the active window and maps target Japanese nodes to overlay items.
      */
     private suspend fun processActiveWindow() {
-        val root = rootInActiveWindow ?: return
-        val pendingNodes = mutableListOf<PendingNode>()
+        try {
+            val root = rootInActiveWindow ?: return
+            val pendingNodes = mutableListOf<PendingNode>()
 
-        // 1. Synchronously traverse tree and pull out layout data on main thread
-        traverseNode(root, pendingNodes)
-        root.recycle() // Recycle root node immediately
-
-        if (pendingNodes.isEmpty()) {
-            overlayCanvasView.updateItems(emptyList())
-            return
-        }
-
-        // 2. Perform tokenization and translation off the main thread
-        val overlayItems = mutableListOf<OverlayItem>()
-        for (pending in pendingNodes) {
-            // TokenizationManager handles threading context switches internally (uses Dispatchers.Default)
-            val romaji = TokenizationManager.tokenizeAndTranslate(pending.text)
-            if (romaji.isNotEmpty()) {
-                overlayItems.add(OverlayItem(pending.bounds, pending.text, romaji))
+            // 1. Synchronously traverse tree and pull out layout data on main thread
+            traverseNode(root, pendingNodes)
+            try {
+                root.recycle() // Recycle root node immediately
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-        }
 
-        // 3. Update overlay items on main thread
-        overlayCanvasView.updateItems(overlayItems)
+            if (pendingNodes.isEmpty()) {
+                overlayCanvasView.updateItems(emptyList())
+                return
+            }
+
+            // 2. Perform tokenization and translation off the main thread
+            val overlayItems = mutableListOf<OverlayItem>()
+            for (pending in pendingNodes) {
+                // TokenizationManager handles threading context switches internally (uses Dispatchers.Default)
+                val romaji = TokenizationManager.tokenizeAndTranslate(pending.text)
+                if (romaji.isNotEmpty()) {
+                    overlayItems.add(OverlayItem(pending.bounds, pending.text, romaji))
+                }
+            }
+
+            // 3. Update overlay items on main thread
+            overlayCanvasView.updateItems(overlayItems)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     /**
@@ -163,20 +177,31 @@ class RomajiOverlayService : AccessibilityService() {
     private fun traverseNode(node: AccessibilityNodeInfo?, targetList: MutableList<PendingNode>) {
         if (node == null) return
 
-        val text = node.text?.toString()
-        if (!text.isNullOrEmpty() && japaneseRegex.containsMatchIn(text)) {
-            val bounds = Rect()
-            node.getBoundsInScreen(bounds)
-            if (!bounds.isEmpty) {
-                // Clone bounds coordinates immediately
-                targetList.add(PendingNode(text, bounds))
+        try {
+            val text = node.text?.toString()
+            if (!text.isNullOrEmpty() && japaneseRegex.containsMatchIn(text)) {
+                val bounds = Rect()
+                node.getBoundsInScreen(bounds)
+                if (!bounds.isEmpty) {
+                    // Clone bounds coordinates immediately
+                    targetList.add(PendingNode(text, bounds))
+                }
             }
-        }
 
-        for (i in 0 until node.childCount) {
-            val child = node.getChild(i)
-            traverseNode(child, targetList)
-            child?.recycle() // Clean up child node reference
+            val count = node.childCount
+            for (i in 0 until count) {
+                val child = node.getChild(i)
+                if (child != null) {
+                    traverseNode(child, targetList)
+                    try {
+                        child.recycle() // Clean up child node reference
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 }

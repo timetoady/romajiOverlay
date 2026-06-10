@@ -58,16 +58,21 @@ object TokenizationManager {
             return@withContext ""
         }
 
-        // Run tokenizer
-        val tokens = currentTokenizer.tokenize(text)
-        val romajiText = RomajiTranslator.translateTokens(tokens)
+        try {
+            // Run tokenizer
+            val tokens = currentTokenizer.tokenize(text)
+            val romajiText = RomajiTranslator.translateTokens(tokens)
 
-        // Store in cache
-        synchronized(translationCache) {
-            translationCache.put(text, romajiText)
+            // Store in cache
+            synchronized(translationCache) {
+                translationCache.put(text, romajiText)
+            }
+
+            romajiText
+        } catch (e: Exception) {
+            e.printStackTrace()
+            ""
         }
-
-        romajiText
     }
 
     /**

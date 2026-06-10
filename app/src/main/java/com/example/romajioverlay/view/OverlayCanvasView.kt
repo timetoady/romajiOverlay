@@ -84,7 +84,7 @@ class OverlayCanvasView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (items.isEmpty()) return
+        if (!isAttachedToWindow || items.isEmpty()) return
 
         // Retrieve the offset of this view relative to the absolute screen window
         // to calibrate getBoundsInScreen coordinates correctly (e.g. accounting for status bar)
@@ -116,6 +116,8 @@ class OverlayCanvasView(context: Context) : View(context) {
         val maxFuriganaWidth = (width - dpToPx(32f)).toInt().coerceAtLeast(100)
 
         for (item in items) {
+            if (item.romajiText.trim().isEmpty()) continue
+
             // Align the bounding box with the local canvas system
             val bounds = Rect(item.bounds)
             bounds.offset(-viewOffsetX, -viewOffsetY)
