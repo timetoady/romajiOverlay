@@ -31,8 +31,9 @@ class RomajiOverlayService : AccessibilityService() {
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
         if (key == "render_mode") {
             val newMode = sharedPreferences.getString("render_mode", "Furigana-Style") ?: "Furigana-Style"
-            overlayCanvasView.renderMode = newMode
-            triggerLayoutReprocess()
+            overlayCanvasView.post {
+                overlayCanvasView.renderMode = newMode
+            }
         }
     }
 
@@ -138,6 +139,19 @@ class RomajiOverlayService : AccessibilityService() {
     private suspend fun processActiveWindow() {
         try {
             val root = rootInActiveWindow ?: return
+            
+            // Verify package matches Google Messages before traversing layout to prevent node corruption
+            val packageName = root.packageName?.toString()
+            if (packageName != "com.google.android.apps.messaging") {
+                try {
+                    root.recycle()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                overlayCanvasView.updateItems(emptyList())
+                return
+            }
+
             val pendingNodes = mutableListOf<PendingNode>()
 
             // 1. Synchronously traverse tree and pull out layout data on main thread
