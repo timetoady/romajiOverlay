@@ -141,9 +141,10 @@ class OverlayCanvasView(context: Context) : View(context) {
                     cardTop = bounds.bottom.toFloat() + dpToPx(4f)
                 }
 
-                // Center tag horizontally relative to bubble, but clamp it within screen margins
-                val cardLeft = (bounds.centerX() - (cardWidth / 2))
-                    .coerceIn(dpToPx(16f), width - cardWidth - dpToPx(16f))
+                // Center tag horizontally relative to bubble, but clamp it within screen margins safely
+                val minLeft = dpToPx(16f)
+                val maxLeft = (width - cardWidth - dpToPx(16f)).coerceAtLeast(minLeft)
+                val cardLeft = (bounds.centerX() - (cardWidth / 2)).coerceIn(minLeft, maxLeft)
 
                 val rectF = RectF(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
 
