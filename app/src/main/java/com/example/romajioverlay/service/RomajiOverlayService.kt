@@ -77,15 +77,20 @@ class RomajiOverlayService : AccessibilityService() {
         
         // Target app: Google Messages
         if (packageName != "com.google.android.apps.messaging") {
-            // Hide overlay when leaving target app
+            // Cancel current analysis job and clear overlays immediately when switching apps
+            analysisJob?.cancel()
             overlayCanvasView.updateItems(emptyList())
             return
         }
 
         when (event.eventType) {
-            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                // Clear overlays immediately during scroll, and schedule reprocess after scroll finishes
+                overlayCanvasView.updateItems(emptyList())
+                triggerLayoutReprocess()
+            }
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 triggerLayoutReprocess()
             }
         }

@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
+import android.text.Layout
+import android.text.StaticLayout
 import android.util.TypedValue
 import android.view.View
 import com.example.romajioverlay.utils.ThemeUtils
@@ -26,7 +28,7 @@ class OverlayCanvasView(context: Context) : View(context) {
     private var items: List<OverlayItem> = emptyList()
 
     // Paints
-    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    private val textPaint = android.text.TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         textAlign = Paint.Align.LEFT
     }
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -61,9 +63,35 @@ class OverlayCanvasView(context: Context) : View(context) {
         postInvalidate()
     }
 
+    /**
+     * Helper to instantiate a StaticLayout to handle multi-line wrapped text drawing.
+     */
+    private fun createStaticLayout(text: String, width: Int): StaticLayout {
+        return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            StaticLayout.Builder.obtain(text, 0, text.length, textPaint, width)
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setLineSpacing(0f, 1.0f)
+                .setIncludePad(false)
+                .build()
+        } else {
+            @Suppress("DEPRECATION")
+            StaticLayout(
+                text, textPaint, width,
+                Layout.Alignment.ALIGN_CENTER, 1.0f, 0.0f, false
+            )
+        }
+    }
+
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (items.isEmpty()) return
+
+        // Retrieve the offset of this view relative to the absolute screen window
+        // to calibrate getBoundsInScreen coordinates correctly (e.g. accounting for status bar)
+        val location = IntArray(2)
+        getLocationOnScreen(location)
+        val viewOffsetX = location[0]
+        val viewOffsetY = location[1]
 
         // 1. Resolve colors based on current system theme
         val themeColors = ThemeUtils.getThemeColors(context)
@@ -72,7 +100,7 @@ class OverlayCanvasView(context: Context) : View(context) {
         textPaint.color = themeColors.textColor
 
         // Dynamic padding sizes based on DP
-        val cardPaddingX = dpToPx(6f)
+        val cardPaddingX = dpToPx(8f)
         val cardPaddingY = dpToPx(4f)
         val cornerRadius = dpToPx(6f)
         borderPaint.strokeWidth = dpToPx(1f)
@@ -84,47 +112,57 @@ class OverlayCanvasView(context: Context) : View(context) {
             textPaint.textSize = spToPx(14f)
         }
 
-        val fontMetrics = textPaint.fontMetrics
-        val textHeight = fontMetrics.bottom - fontMetrics.top
-        val textAscentOffset = -fontMetrics.ascent
+        // Limit tag widths to fit screen width with standard 16dp margins
+        val maxFuriganaWidth = (width - dpToPx(32f)).toInt().coerceAtLeast(100)
 
         for (item in items) {
-            val bounds = item.bounds
+            // Align the bounding box with the local canvas system
+            val bounds = Rect(item.bounds)
+            bounds.offset(-viewOffsetX, -viewOffsetY)
+
             if (bounds.isEmpty) continue
 
-            val textWidth = textPaint.measureText(item.romajiText)
-
             if (renderMode == "Furigana-Style") {
-                // Calculate size of the Furigana tag
-                val cardWidth = textWidth + (cardPaddingX * 2)
-                val cardHeight = textHeight + (cardPaddingY * 2)
+                // Calculate size of the Furigana tag, wrapping text if it exceeds screen width
+                val measuredWidth = textPaint.measureText(item.romajiText).toInt()
+                val layoutWidth = minOf(measuredWidth, maxFuriganaWidth).coerceAtLeast(10)
+                val staticLayout = createStaticLayout(item.romajiText, layoutWidth)
+
+                val cardWidth = staticLayout.width + (cardPaddingX * 2)
+                val cardHeight = staticLayout.height + (cardPaddingY * 2)
 
                 // Try to place above bubble
                 var cardTop = bounds.top - cardHeight - dpToPx(4f)
                 
                 // If it falls off the top of screen, place it below bubble instead
-                if (cardTop < dpToPx(48f)) { // 48dp approximate status bar offset
+                if (cardTop < dpToPx(4f)) {
                     cardTop = bounds.bottom.toFloat() + dpToPx(4f)
                 }
 
-                val cardLeft = bounds.centerX() - (cardWidth / 2)
-                val cardRight = cardLeft + cardWidth
-                val cardBottom = cardTop + cardHeight
+                // Center tag horizontally relative to bubble, but clamp it within screen margins
+                val cardLeft = (bounds.centerX() - (cardWidth / 2))
+                    .coerceIn(dpToPx(16f), width - cardWidth - dpToPx(16f))
 
-                val rectF = RectF(cardLeft, cardTop, cardRight, cardBottom)
+                val rectF = RectF(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
 
                 // Draw translucent card background
                 canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, bgPaint)
                 // Draw card stroke
                 canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, borderPaint)
 
-                // Draw translation text centered in card
-                val textX = cardLeft + cardPaddingX
-                val textY = cardTop + cardPaddingY + textAscentOffset
-                canvas.drawText(item.romajiText, textX, textY, textPaint)
+                // Draw translation text using StaticLayout
+                canvas.save()
+                canvas.translate(cardLeft + cardPaddingX, cardTop + cardPaddingY)
+                staticLayout.draw(canvas)
+                canvas.restore()
 
             } else {
                 // Overlay-Style: Cover the native text completely
+                val maxLayoutWidth = (bounds.width() - cardPaddingX * 2).toInt()
+                if (maxLayoutWidth <= 0) continue
+
+                val staticLayout = createStaticLayout(item.romajiText, maxLayoutWidth)
+
                 val rectF = RectF(
                     bounds.left.toFloat(),
                     bounds.top.toFloat(),
@@ -137,10 +175,14 @@ class OverlayCanvasView(context: Context) : View(context) {
                 // Draw stroke
                 canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, borderPaint)
 
-                // Draw centered Romaji text
-                val textX = bounds.left + (bounds.width() - textWidth) / 2
-                val textY = bounds.top + (bounds.height() - textHeight) / 2 + textAscentOffset
-                canvas.drawText(item.romajiText, textX, textY, textPaint)
+                // Draw centered Romaji text (wrapping lines inside bubble bounds)
+                val textX = bounds.left + cardPaddingX
+                val textY = bounds.top + (bounds.height() - staticLayout.height) / 2f
+
+                canvas.save()
+                canvas.translate(textX, textY)
+                staticLayout.draw(canvas)
+                canvas.restore()
             }
         }
     }

@@ -216,48 +216,27 @@ object RomajiTranslator {
     fun translateTokens(tokens: List<Token>): String {
         if (tokens.isEmpty()) return ""
 
-        val sb = StringBuilder()
+        // 1. Group adjacent tokens that should not be separated by spaces
+        class TokenGroup {
+            val tokens = mutableListOf<Token>()
+        }
+
+        val groups = mutableListOf<TokenGroup>()
+        var currentGroup = TokenGroup()
+        groups.add(currentGroup)
 
         for (idx in tokens.indices) {
             val token = tokens[idx]
-            val surface = token.surface
             val pos1 = token.partOfSpeechLevel1
+            val surface = token.surface
 
-            // 1. Resolve reading in Katakana
-            var reading = token.reading
-            if (reading == null || reading == "*") {
-                reading = hiraganaToKatakana(surface)
-            }
-
-            // 2. Pronunciation adjustments for particles
-            var romaji = if (pos1 == "助詞") {
-                when (surface) {
-                    "は" -> "wa"
-                    "へ" -> "e"
-                    "を" -> "o"
-                    else -> katakanaToRomaji(reading)
-                }
-            } else {
-                katakanaToRomaji(reading)
-            }
-
-            if (romaji.isEmpty() && surface.isNotEmpty()) {
-                // If translation returned empty but surface is English or symbol, keep surface
-                if (surface.matches(Regex("[a-zA-Z0-9]+"))) {
-                    romaji = surface
-                }
-            }
-
-            if (romaji.isEmpty()) continue
-
-            // 3. Determine spacing before appending
+            // Determine if a space is needed before this token
             val needsSpace = if (idx == 0) {
                 false
             } else {
                 val prevToken = tokens[idx - 1]
                 val prevPos1 = prevToken.partOfSpeechLevel1
 
-                // Conditions where space is NOT needed:
                 val isCurrentSuffix = pos1 == "接尾辞" || token.partOfSpeechLevel2 == "接尾"
                 val isCurrentAuxVerb = pos1 == "助動詞" && surface != "です" && surface != "だ"
                 val isPrevPrefix = prevPos1 == "接頭詞"
@@ -267,10 +246,67 @@ object RomajiTranslator {
                 !(isCurrentSuffix || isCurrentAuxVerb || isPrevPrefix || isCurrentPunctuation || isPrevPunctuation)
             }
 
-            if (needsSpace && sb.isNotEmpty()) {
-                sb.append(" ")
+            if (needsSpace && currentGroup.tokens.isNotEmpty()) {
+                currentGroup = TokenGroup()
+                groups.add(currentGroup)
             }
-            sb.append(romaji)
+
+            currentGroup.tokens.add(token)
+        }
+
+        // 2. Translate each group as a single consolidated unit
+        val sb = StringBuilder()
+        for (group in groups) {
+            if (group.tokens.isEmpty()) continue
+
+            var groupRomaji = ""
+
+            // Handle particle override only if the group is a single particle token
+            if (group.tokens.size == 1) {
+                val singleToken = group.tokens[0]
+                if (singleToken.partOfSpeechLevel1 == "助詞") {
+                    groupRomaji = when (singleToken.surface) {
+                        "は" -> "wa"
+                        "へ" -> "e"
+                        "を" -> "o"
+                        else -> {
+                            var reading = singleToken.reading
+                            if (reading == null || reading == "*") {
+                                reading = hiraganaToKatakana(singleToken.surface)
+                            }
+                            katakanaToRomaji(reading)
+                        }
+                    }
+                }
+            }
+
+            if (groupRomaji.isEmpty()) {
+                // Concatenate readings of all tokens in this group
+                val groupReading = StringBuilder()
+                for (token in group.tokens) {
+                    var reading = token.reading
+                    if (reading == null || reading == "*") {
+                        reading = hiraganaToKatakana(token.surface)
+                    }
+                    groupReading.append(reading)
+                }
+                groupRomaji = katakanaToRomaji(groupReading.toString())
+            }
+
+            if (groupRomaji.isEmpty()) {
+                // Fallback to surface text if translation is empty (e.g. English, digits)
+                val surfaceText = group.tokens.joinToString("") { it.surface }
+                if (surfaceText.matches(Regex("[a-zA-Z0-9]+"))) {
+                    groupRomaji = surfaceText
+                }
+            }
+
+            if (groupRomaji.isNotEmpty()) {
+                if (sb.isNotEmpty()) {
+                    sb.append(" ")
+                }
+                sb.append(groupRomaji)
+            }
         }
 
         return sb.toString().trim()
