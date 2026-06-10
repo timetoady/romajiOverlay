@@ -122,8 +122,8 @@ fun WelcomeHeader() {
             .background(
                 brush = Brush.horizontalGradient(
                     colors = listOf(
-                        MaterialTheme.colorScheme.primary,
-                        MaterialTheme.colorScheme.tertiary
+                        MaterialTheme.colorScheme.primaryContainer,
+                        MaterialTheme.colorScheme.secondaryContainer
                     )
                 ),
                 shape = RoundedCornerShape(12.dp)
@@ -133,13 +133,13 @@ fun WelcomeHeader() {
         Column {
             Text(
                 "Japanese Accessibility Overlay",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 "Translates Japanese text in Google Messages to Romaji in real-time.",
-                color = Color.White.copy(alpha = 0.85f),
+                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 4.dp)
             )
