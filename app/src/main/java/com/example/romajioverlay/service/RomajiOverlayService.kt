@@ -15,9 +15,21 @@ import kotlinx.coroutines.*
 
 class RomajiOverlayService : AccessibilityService() {
 
+    companion object {
+        /** All apps this service knows how to overlay. */
+        val SUPPORTED_PACKAGES = mapOf(
+            "com.google.android.apps.messaging" to "app_google_messages",
+            "com.facebook.orca" to "app_meta_messenger"
+        )
+    }
+
     private lateinit var windowManager: WindowManager
     private lateinit var overlayCanvasView: OverlayCanvasView
     private lateinit var prefs: SharedPreferences
+
+    // Set of currently enabled target package names, rebuilt from SharedPreferences
+    @Volatile
+    private var enabledPackages: Set<String> = emptySet()
 
     // Coroutine Scope bound to service lifecycle
     private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
@@ -35,10 +47,28 @@ class RomajiOverlayService : AccessibilityService() {
                 overlayCanvasView.renderMode = newMode
             }
         }
+        // Rebuild enabled packages when any app toggle changes
+        if (key != null && key.startsWith("app_")) {
+            enabledPackages = buildEnabledPackages(sharedPreferences)
+        }
     }
 
     // Temporary storage for node data extracted synchronously on the UI thread
     private data class PendingNode(val text: String, val bounds: Rect)
+
+    /**
+     * Builds the set of enabled package names from SharedPreferences.
+     * Google Messages defaults to ON; others default to OFF.
+     */
+    private fun buildEnabledPackages(sp: SharedPreferences): Set<String> {
+        return SUPPORTED_PACKAGES.entries
+            .filter { (pkg, prefKey) ->
+                val defaultOn = (pkg == "com.google.android.apps.messaging")
+                sp.getBoolean(prefKey, defaultOn)
+            }
+            .map { it.key }
+            .toSet()
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -50,6 +80,7 @@ class RomajiOverlayService : AccessibilityService() {
         prefs = getSharedPreferences("RomajiOverlayPrefs", Context.MODE_PRIVATE)
         overlayCanvasView = OverlayCanvasView(this)
         overlayCanvasView.renderMode = prefs.getString("render_mode", "Furigana-Style") ?: "Furigana-Style"
+        enabledPackages = buildEnabledPackages(prefs)
 
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
     }
@@ -82,8 +113,8 @@ class RomajiOverlayService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         val packageName = event.packageName?.toString()
         
-        // Target app: Google Messages
-        if (packageName != "com.google.android.apps.messaging") {
+        // Only process events from enabled target apps
+        if (packageName == null || packageName !in enabledPackages) {
             // Cancel current analysis job and clear overlays immediately when switching apps
             analysisJob?.cancel()
             overlayCanvasView.updateItems(emptyList())
@@ -140,9 +171,9 @@ class RomajiOverlayService : AccessibilityService() {
         try {
             val root = rootInActiveWindow ?: return
             
-            // Verify package matches Google Messages before traversing layout to prevent node corruption
+            // Verify package matches an enabled target app before traversing
             val packageName = root.packageName?.toString()
-            if (packageName != "com.google.android.apps.messaging") {
+            if (packageName == null || packageName !in enabledPackages) {
                 overlayCanvasView.updateItems(emptyList())
                 return
             }
@@ -182,7 +213,10 @@ class RomajiOverlayService : AccessibilityService() {
         if (node == null) return
 
         try {
+            // Check node.text first, then fall back to contentDescription
+            // (Litho-based apps like Meta Messenger may store text in contentDescription)
             val text = node.text?.toString()
+                ?: node.contentDescription?.toString()
             if (!text.isNullOrEmpty() && japaneseRegex.containsMatchIn(text)) {
                 val bounds = Rect()
                 node.getBoundsInScreen(bounds)

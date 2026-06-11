@@ -3,6 +3,7 @@ package com.example.romajioverlay.ui.main
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.provider.Settings
 import android.text.TextUtils
 import androidx.compose.foundation.background
@@ -101,7 +102,10 @@ fun MainScreen(
                 }
             )
 
-            // 3. User Onboarding Guide
+            // 3. Target Apps Settings Card
+            TargetAppsCard(prefs = prefs)
+
+            // 4. User Onboarding Guide
             GuideCard()
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -138,7 +142,7 @@ fun WelcomeHeader() {
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Translates Japanese text in Google Messages to Romaji in real-time.",
+                "Translates Japanese text in Google Messages & Meta Messenger to Romaji in real-time.",
                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
                 fontSize = 13.sp,
                 modifier = Modifier.padding(top = 4.dp)
@@ -190,7 +194,7 @@ fun StatusCard(isEnabled: Boolean, onOpenSettings: () -> Unit) {
 
             Text(
                 text = if (isEnabled) {
-                    "The Accessibility Service is running. Open Google Messages to view overlays."
+                    "The Accessibility Service is running. Open Google Messages or Meta Messenger to view overlays."
                 } else {
                     "The service requires accessibility permissions to read message bubbles and draw overlays."
                 },
@@ -291,7 +295,7 @@ fun GuideCard() {
                 "1. Tap 'Enable in Settings' above to open accessibility page.",
                 "2. Navigate to 'Installed Apps' or 'Downloaded Services'.",
                 "3. Tap 'RomajiOverlay' and toggle the service switch ON.",
-                "4. Open Google Messages (com.google.android.apps.messaging).",
+                "4. Open Google Messages or Meta Messenger (ensure they are toggled on in Target Apps).",
                 "5. Write or open a chat message containing Japanese text (e.g. こんにちは or 東京).",
                 "6. The Romaji translation overlay will immediately draw over the text."
             )
@@ -324,6 +328,98 @@ fun GuideCard() {
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
                 modifier = Modifier.padding(top = 4.dp)
             )
+        }
+    }
+}
+
+@Composable
+fun TargetAppsCard(prefs: SharedPreferences) {
+    var googleMessagesEnabled by remember {
+        mutableStateOf(prefs.getBoolean("app_google_messages", true))
+    }
+    var metaMessengerEnabled by remember {
+        mutableStateOf(prefs.getBoolean("app_meta_messenger", false))
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                "Target Apps",
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp
+            )
+            Text(
+                "Choose which messaging apps the overlay will attach to.",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            // Google Messages
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Google Messages",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        "com.google.android.apps.messaging",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
+                Switch(
+                    checked = googleMessagesEnabled,
+                    onCheckedChange = { enabled ->
+                        googleMessagesEnabled = enabled
+                        prefs.edit().putBoolean("app_google_messages", enabled).apply()
+                    }
+                )
+            }
+
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f))
+
+            // Meta Messenger
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Meta Messenger",
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        "com.facebook.orca",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
+                Switch(
+                    checked = metaMessengerEnabled,
+                    onCheckedChange = { enabled ->
+                        metaMessengerEnabled = enabled
+                        prefs.edit().putBoolean("app_meta_messenger", enabled).apply()
+                    }
+                )
+            }
         }
     }
 }
