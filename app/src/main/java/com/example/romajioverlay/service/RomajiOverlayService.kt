@@ -11,6 +11,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 import com.example.romajioverlay.nlp.TokenizationManager
 import com.example.romajioverlay.view.OverlayCanvasView
 import com.example.romajioverlay.view.OverlayItem
+import com.example.romajioverlay.utils.TextCleanupUtils
 import kotlinx.coroutines.*
 
 class RomajiOverlayService : AccessibilityService() {
@@ -215,14 +216,23 @@ class RomajiOverlayService : AccessibilityService() {
         try {
             // Check node.text first, then fall back to contentDescription
             // (Litho-based apps like Meta Messenger may store text in contentDescription)
-            val text = node.text?.toString()
+            val rawText = node.text?.toString()
                 ?: node.contentDescription?.toString()
-            if (!text.isNullOrEmpty() && japaneseRegex.containsMatchIn(text)) {
-                val bounds = Rect()
-                node.getBoundsInScreen(bounds)
-                if (!bounds.isEmpty) {
-                    // Clone bounds coordinates immediately
-                    targetList.add(PendingNode(text, bounds))
+            if (!rawText.isNullOrEmpty() && japaneseRegex.containsMatchIn(rawText)) {
+                val isMessenger = node.packageName?.toString() == "com.facebook.orca"
+                val text = if (isMessenger) {
+                    TextCleanupUtils.cleanMessengerText(rawText)
+                } else {
+                    rawText
+                }
+
+                if (japaneseRegex.containsMatchIn(text)) {
+                    val bounds = Rect()
+                    node.getBoundsInScreen(bounds)
+                    if (!bounds.isEmpty) {
+                        // Clone bounds coordinates immediately
+                        targetList.add(PendingNode(text, bounds))
+                    }
                 }
             }
 

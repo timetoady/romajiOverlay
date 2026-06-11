@@ -2,6 +2,7 @@ package com.example.romajioverlay
 
 import com.atilika.kuromoji.ipadic.Tokenizer
 import com.example.romajioverlay.nlp.RomajiTranslator
+import com.example.romajioverlay.utils.TextCleanupUtils
 import org.junit.Assert.assertEquals
 import org.junit.BeforeClass
 import org.junit.Test
@@ -94,6 +95,29 @@ class RomajiTranslatorTest {
         val tokens3 = tokenizer.tokenize("合ってる")
         val result3 = RomajiTranslator.translateTokens(tokens3)
         assertEquals("atteru", result3)
+    }
+
+    @Test
+    fun testMessengerTextCleanup() {
+        // Case 1: Standard incoming message with sender name and double tap instructions
+        val raw1 = "Traci, なんでバスケットの形にしたんかね, double tap to see sent/receive date and time, double tap and hold to react on message"
+        assertEquals("なんでバスケットの形にしたんかね", TextCleanupUtils.cleanMessengerText(raw1))
+
+        // Case 2: Outgoing message starting with "You"
+        val raw2 = "You, これ、テストです。, double tap to see details"
+        assertEquals("これ、テストです。", TextCleanupUtils.cleanMessengerText(raw2))
+
+        // Case 3: No comma in prefix
+        val raw3 = "Traci なんでバスケットの形にしたんかね, double tap to see details"
+        assertEquals("なんでバスケットの形にしたんかね", TextCleanupUtils.cleanMessengerText(raw3))
+
+        // Case 4: No Japanese at all (should return original string, though service filters this first)
+        val raw4 = "Hello, this is just a test"
+        assertEquals("Hello, this is just a test", TextCleanupUtils.cleanMessengerText(raw4))
+
+        // Case 5: Japanese with English words inside the message (should keep the English words inside)
+        val raw5 = "You, Googleで検索して, double tap to see details"
+        assertEquals("Googleで検索して", TextCleanupUtils.cleanMessengerText(raw5))
     }
 }
 
