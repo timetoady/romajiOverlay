@@ -112,80 +112,79 @@ class OverlayCanvasView(context: Context) : View(context) {
             textPaint.textSize = spToPx(14f)
         }
 
-        // Limit tag widths to fit screen width with standard 16dp margins
-        val maxFuriganaWidth = (width - dpToPx(32f)).toInt().coerceAtLeast(100)
-
         for (item in items) {
-            if (item.romajiText.trim().isEmpty()) continue
+            try {
+                if (item.romajiText.trim().isEmpty()) continue
 
-            // Align the bounding box with the local canvas system
-            val bounds = Rect(item.bounds)
-            bounds.offset(-viewOffsetX, -viewOffsetY)
+                // Align the bounding box with the local canvas system
+                val bounds = Rect(item.bounds)
+                bounds.offset(-viewOffsetX, -viewOffsetY)
 
-            if (bounds.isEmpty) continue
+                if (bounds.isEmpty || bounds.width() <= 0) continue
 
-            if (renderMode == "Furigana-Style") {
-                // Calculate size of the Furigana tag, wrapping text if it exceeds screen width
-                val measuredWidth = textPaint.measureText(item.romajiText).toInt()
-                val layoutWidth = minOf(measuredWidth, maxFuriganaWidth).coerceAtLeast(10)
+                // Compute layout width from the bubble bounds, with padding inset
+                val layoutWidth = (bounds.width() - cardPaddingX * 2).toInt()
+                if (layoutWidth <= 0) continue
+
                 val staticLayout = createStaticLayout(item.romajiText, layoutWidth)
 
-                val cardWidth = staticLayout.width + (cardPaddingX * 2)
-                val cardHeight = staticLayout.height + (cardPaddingY * 2)
+                if (renderMode == "Furigana-Style") {
+                    // Furigana-Style: Draw a compact card aligned to the bubble's width,
+                    // positioned directly above it (or below if no room above).
+                    val cardHeight = staticLayout.height + (cardPaddingY * 2)
 
-                // Try to place above bubble
-                var cardTop = bounds.top - cardHeight - dpToPx(4f)
-                
-                // If it falls off the top of screen, place it below bubble instead
-                if (cardTop < dpToPx(4f)) {
-                    cardTop = bounds.bottom.toFloat() + dpToPx(4f)
+                    // Try to place above bubble
+                    var cardTop = bounds.top - cardHeight - dpToPx(2f)
+
+                    // If it falls off the top of screen, place it below bubble instead
+                    if (cardTop < 0f) {
+                        cardTop = bounds.bottom.toFloat() + dpToPx(2f)
+                    }
+
+                    val rectF = RectF(
+                        bounds.left.toFloat(),
+                        cardTop,
+                        bounds.right.toFloat(),
+                        cardTop + cardHeight
+                    )
+
+                    // Draw translucent card background
+                    canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, bgPaint)
+                    // Draw card stroke
+                    canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, borderPaint)
+
+                    // Draw translation text using StaticLayout
+                    canvas.save()
+                    canvas.translate(bounds.left + cardPaddingX, cardTop + cardPaddingY)
+                    staticLayout.draw(canvas)
+                    canvas.restore()
+
+                } else {
+                    // Overlay-Style: Cover the native text completely
+                    val rectF = RectF(
+                        bounds.left.toFloat(),
+                        bounds.top.toFloat(),
+                        bounds.right.toFloat(),
+                        bounds.bottom.toFloat()
+                    )
+
+                    // Draw translucent background covering the bubble
+                    canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, bgPaint)
+                    // Draw stroke
+                    canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, borderPaint)
+
+                    // Draw centered Romaji text (wrapping lines inside bubble bounds)
+                    val textX = bounds.left + cardPaddingX
+                    val textY = bounds.top + (bounds.height() - staticLayout.height) / 2f
+
+                    canvas.save()
+                    canvas.translate(textX, textY)
+                    staticLayout.draw(canvas)
+                    canvas.restore()
                 }
-
-                // Center tag horizontally relative to bubble, but clamp it within screen margins safely
-                val minLeft = dpToPx(16f)
-                val maxLeft = (width - cardWidth - dpToPx(16f)).coerceAtLeast(minLeft)
-                val cardLeft = (bounds.centerX() - (cardWidth / 2)).coerceIn(minLeft, maxLeft)
-
-                val rectF = RectF(cardLeft, cardTop, cardLeft + cardWidth, cardTop + cardHeight)
-
-                // Draw translucent card background
-                canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, bgPaint)
-                // Draw card stroke
-                canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, borderPaint)
-
-                // Draw translation text using StaticLayout
-                canvas.save()
-                canvas.translate(cardLeft + cardPaddingX, cardTop + cardPaddingY)
-                staticLayout.draw(canvas)
-                canvas.restore()
-
-            } else {
-                // Overlay-Style: Cover the native text completely
-                val maxLayoutWidth = (bounds.width() - cardPaddingX * 2).toInt()
-                if (maxLayoutWidth <= 0) continue
-
-                val staticLayout = createStaticLayout(item.romajiText, maxLayoutWidth)
-
-                val rectF = RectF(
-                    bounds.left.toFloat(),
-                    bounds.top.toFloat(),
-                    bounds.right.toFloat(),
-                    bounds.bottom.toFloat()
-                )
-
-                // Draw translucent background covering the bubble
-                canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, bgPaint)
-                // Draw stroke
-                canvas.drawRoundRect(rectF, cornerRadius, cornerRadius, borderPaint)
-
-                // Draw centered Romaji text (wrapping lines inside bubble bounds)
-                val textX = bounds.left + cardPaddingX
-                val textY = bounds.top + (bounds.height() - staticLayout.height) / 2f
-
-                canvas.save()
-                canvas.translate(textX, textY)
-                staticLayout.draw(canvas)
-                canvas.restore()
+            } catch (e: Exception) {
+                // Protect the accessibility service from being killed by draw errors
+                e.printStackTrace()
             }
         }
     }
